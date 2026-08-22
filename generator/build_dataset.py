@@ -13,6 +13,13 @@ from schema.dsl import Action, actions_match  # noqa: E402
 
 COMPOUND_JOINERS = [" and ", " and then ", " then ", ", then ", ", and "]
 
+UNAVAILABLE = [
+    "go wash yourself", "make me a coffee", "fly to the moon",
+    "dance for me", "tell me a joke", "what's the weather",
+    "sing a song", "cook dinner", "water the plants",
+    "do my homework", "pet the dog", "jump three times",
+]
+
 
 def make_compound(rng: random.Random):
     gens = list(GENERATORS)
@@ -61,16 +68,17 @@ def generate(n_atomic: int = 3000, n_compound: int = 800, n_offtopic: int = 300,
         text = corrupt(text, rng)
         add(text, actions, {"kind": "compound", "clause_lengths": bounds})
 
-    for t in OFF_TOPIC:
+    unavailable = OFF_TOPIC + UNAVAILABLE
+    for t in unavailable:
         for variant in (t, politize(t, rng)):
-            add(variant, [], {"kind": "off_topic"})
+            add(variant, [Action("UNAVAILABLE", {})], {"kind": "unavailable"})
 
-    for _ in range(n_offtopic - 2 * len(OFF_TOPIC)):
+    for _ in range(n_offtopic - 2 * len(unavailable)):
         gen = rng.choice([give, move])
         text, actions = gen()
         words = text.split()
         rng.shuffle(words)
-        add(" ".join(words), [], {"kind": "off_topic_scrambled"})
+        add(" ".join(words), [Action("UNAVAILABLE", {})], {"kind": "unavailable_scrambled"})
 
     bad = [r for r in records if not actions_match(
         [Action.from_dict(a) for a in r["actions"]],

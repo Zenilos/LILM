@@ -15,6 +15,7 @@ INTENTS = (
     "STOP",
     "WAIT",
     "WAKEUP",
+    "UNAVAILABLE",
 )
 
 SLOTS = {
@@ -25,8 +26,9 @@ SLOTS = {
     "GET": {"required": ("object",), "optional": ()},
     "GIVE": {"required": ("object", "recipient"), "optional": ()},
     "STOP": {"required": (), "optional": ()},
-    "WAIT": {"required": ("duration",), "optional": ()},
+    "WAIT": {"required": ("duration_amount", "duration_unit"), "optional": ()},
     "WAKEUP": {"required": ("recipient",), "optional": ()},
+    "UNAVAILABLE": {"required": (), "optional": ()},
 }
 
 ALL_SLOTS = (
@@ -34,7 +36,8 @@ ALL_SLOTS = (
     "object",
     "recipient",
     "file",
-    "duration",
+    "duration_amount",
+    "duration_unit",
     "message",
     "person",
 )

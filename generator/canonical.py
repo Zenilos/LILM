@@ -30,10 +30,24 @@ FILES = [
 ]
 
 DURATIONS = [
-    "5 seconds", "five seconds", "10 sec", "2 minutes", "two minutes",
-    "half an hour", "a minute", "30 seconds", "one minute", "a couple minutes",
-    "15 minutes", "three seconds",
+    ("5", "seconds"), ("5", "seconds"), ("10", "seconds"),
+    ("30", "seconds"), ("2", "minutes"), ("2", "minutes"),
+    ("1", "minutes"), ("15", "minutes"), ("30", "minutes"),
+    ("45", "seconds"), ("3", "seconds"), ("1", "hours"),
 ]
+
+DURATION_PHRASES = {
+    "five seconds": ("5", "seconds"),
+    "two minutes": ("2", "minutes"),
+    "ten seconds": ("10", "seconds"),
+    "half an hour": ("30", "minutes"),
+    "a minute": ("1", "minutes"),
+    "a couple minutes": ("2", "minutes"),
+    "an hour": ("1", "hours"),
+    "one minute": ("1", "minutes"),
+    "thirty seconds": ("30", "seconds"),
+    "quarter of an hour": ("15", "minutes"),
+}
 
 MESSAGES = [
     "hello", "dinner is ready", "time for bed", "welcome home",
@@ -125,14 +139,25 @@ def stop() -> tuple[str, list[Action]]:
 
 
 def wait() -> tuple[str, list[Action]]:
-    d = random.choice(DURATIONS)
-    return (random.choice([
-        f"wait {d}",
-        f"wait for {d}",
-        f"hold on for {d}",
-        f"pause for {d}",
-        f"hold on {d}",
-    ]), [Action("WAIT", {"duration": d})])
+    if random.random() < 0.35:
+        phrase = random.choice(list(DURATION_PHRASES))
+        amount, unit = DURATION_PHRASES[phrase]
+        template = random.choice([
+            f"wait {phrase}",
+            f"wait for {phrase}",
+            f"hold on for {phrase}",
+            f"pause for {phrase}",
+        ])
+    else:
+        amount, unit = random.choice(DURATIONS)
+        template = random.choice([
+            f"wait {amount} {unit}",
+            f"wait for {amount} {unit}",
+            f"hold on for {amount} {unit}",
+            f"pause for {amount} {unit}",
+            f"hold on {amount} {unit}",
+        ])
+    return (template, [Action("WAIT", {"duration_amount": amount, "duration_unit": unit})])
 
 
 def wakeup() -> tuple[str, list[Action]]:

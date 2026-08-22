@@ -27,19 +27,22 @@ Known accepted costs: ~25–40 s/command (~1.87 tok/s), ~51 s boot prime per pow
 
 ## 2. DSL — single source of truth
 
-Nine atomic intents; HANDOVER = GET then GIVE; WAKEUP is ONE NLU action expanded by firmware planner (move-to-person + wake sound).
+Nine atomic intents + UNAVAILABLE reject class; HANDOVER = GET then GIVE; WAKEUP is ONE NLU action expanded by firmware planner (move-to-person + wake sound).
 
-| Intent | Required slots | Optional |
+| Intent | Required fields | Optional |
 |---|---|---|
-| `MOVE` | `location` | |
+| `MOVE` | `location` (string) | |
 | `CLEAN` | | `location` |
-| `PLAY` | `file` | (SD-card filename) |
-| `SHOW` | `message` | `person` |
-| `GET` | `object` | |
+| `PLAY` | `file` (string, SD-card filename) | |
+| `SHOW` | `message` (string) | `person` |
+| `GET` | `object` (string) | |
 | `GIVE` | `object`, `recipient` | |
 | `STOP` | | |
-| `WAIT` | `duration` | |
+| `WAIT` | `duration_amount` (**number**), `duration_unit` (enum seconds/minutes/hours) | |
 | `WAKEUP` | `recipient` | |
+| `UNAVAILABLE` | — (command unclear / not doable → robot says so) | |
+
+Duration is normalized at data-generation time, not copied as a span: "five seconds" → `5/seconds`, "half an hour" → `30/minutes`. Firmware does unit math only.
 
 Canonical prediction = ordered `list[{intent, slots}]`.
 
