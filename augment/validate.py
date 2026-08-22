@@ -6,6 +6,9 @@ import time
 from pathlib import Path
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
+LOCAL_MODEL = "qwen2.5:7b-instruct"
+USE_LOCAL = True
 
 FREE_MODELS = [
     "google/gemma-4-31b-it:free",
@@ -33,7 +36,6 @@ def _load_key() -> str:
 
 
 def chat(messages: list[dict], model: str | None = None, max_retries: int = 6) -> str:
-    key = _load_key()
     body = {
         "messages": messages,
         "temperature": 0,
@@ -41,12 +43,16 @@ def chat(messages: list[dict], model: str | None = None, max_retries: int = 6) -
     }
     last_err: Exception | None = None
     for attempt in range(max_retries):
-        use_model = model or FREE_MODELS[attempt % len(FREE_MODELS)]
-        body["model"] = use_model
+        if USE_LOCAL:
+            url, key = OLLAMA_URL, "ollama"
+            body["model"] = LOCAL_MODEL
+        else:
+            url, key = OPENROUTER_URL, _load_key()
+            body["model"] = model or FREE_MODELS[attempt % len(FREE_MODELS)]
         try:
-            with httpx.Client(timeout=60) as client:
+            with httpx.Client(timeout=120) as client:
                 r = client.post(
-                    OPENROUTER_URL,
+                    url,
                     content=json.dumps(body).encode(),
                     headers={
                         "Authorization": f"Bearer {key}",
@@ -58,7 +64,7 @@ def chat(messages: list[dict], model: str | None = None, max_retries: int = 6) -
             content = data["choices"][0]["message"]["content"]
             if content:
                 return content.strip()
-            last_err = RuntimeError(f"empty content from {use_model}")
+            last_err = RuntimeError(f"empty content from {body['model']}")
         except Exception as e:
             last_err = e
         time.sleep(2 ** min(attempt, 4))

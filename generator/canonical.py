@@ -8,6 +8,9 @@ LOCATIONS = [
     "the kitchen", "kitchen", "my room", "the living room", "living room",
     "the garage", "garage", "here", "the hallway", "hallway",
     "the bedroom", "bedroom", "where I cook", "my side",
+    "the bathroom", "bathroom", "the study", "the balcony", "balcony",
+    "the dining room", "the basement", "the office", "work room",
+    "mom's room", "the kids room", "the entrance", "the backyard",
 ]
 
 OBJECTS = [
@@ -15,11 +18,15 @@ OBJECTS = [
     "the box", "box", "the remote", "my phone", "the towel",
     "the trash", "trash", "the toy", "toy", "the keys", "keys",
     "the plate", "plate", "bottle", "the bottle",
+    "the blue mug", "mug", "the book", "book", "the charger",
+    "the umbrella", "umbrella", "the scissors", "scissors",
+    "the package", "package", "the glasses", "glasses",
 ]
 
 RECIPIENTS = [
     "John", "my wife", "the kids", "my daughter", "Sara", "my son",
-    "mom", "dad", "Alex", "grandma",
+    "mom", "dad", "Alex", "grandma", "grandpa", "Emma", "Omar",
+    "my brother", "my sister", "the guests", "Lina",
 ]
 
 PEOPLE = RECIPIENTS
@@ -27,6 +34,8 @@ PEOPLE = RECIPIENTS
 FILES = [
     "song.mp3", "alarm.wav", "wake.mp3", "ring.wav", "beep.wav",
     "music.mp3", "tone.wav", "chime.mp3", "alert.wav", "podcast.mp3",
+    "lullaby.mp3", "doorbell.wav", "siren.wav", "jingle.mp3",
+    "notification.wav", "azan.mp3", "birthday.mp3",
 ]
 
 DURATIONS = [
@@ -66,6 +75,11 @@ def move() -> tuple[str, list[Action]]:
         f"walk to {loc}",
         f"come to {loc}" if loc != "here" else "come here",
         f"make your way to {loc}",
+        f"go over to {loc}",
+        f"head over to {loc}",
+        f"drive to {loc}",
+        f"go towards {loc}",
+        f"{loc}, go",
     ]), [Action("MOVE", {"location": loc})])
 
 
@@ -78,8 +92,14 @@ def clean() -> tuple[str, list[Action]]:
             f"vacuum {loc}",
             f"mop {loc}",
             f"please clean {loc}",
+            f"go clean {loc}",
+            f"sweep {loc}",
+            f"tidy up {loc}",
+            f"do the cleaning in {loc}",
         ]), [Action("CLEAN", {"location": loc})])
-    return (random.choice(["clean", "start cleaning", "vacuum", "do the cleaning"]),
+    return (random.choice(["clean", "start cleaning", "vacuum", "do the cleaning",
+                           "start cleaning now", "go clean something",
+                           "vacuum the floor"]),
             [Action("CLEAN", {})])
 
 
@@ -90,6 +110,9 @@ def play() -> tuple[str, list[Action]]:
         f"play the file {f}",
         f"put on {f}",
         f"play song {f}",
+        f"play audio {f}",
+        f"start playing {f}",
+        f"play track {f}",
     ]), [Action("PLAY", {"file": f})])
 
 
@@ -100,11 +123,14 @@ def show() -> tuple[str, list[Action]]:
         return (random.choice([
             f"show {m} to {p}",
             f"display {m} for {p}",
+            f"show the message {m} to {p}",
         ]), [Action("SHOW", {"message": m, "person": p})])
     return (random.choice([
         f"show {m}",
         f"display {m}",
         f"show message {m}",
+        f"put {m} on the screen",
+        f"write {m}",
     ]), [Action("SHOW", {"message": m})])
 
 
@@ -116,6 +142,8 @@ def get() -> tuple[str, list[Action]]:
         f"grab {o}",
         f"bring me {o}",
         f"fetch {o}",
+        f"bring {o} here",
+        f"go get {o}",
     ]), [Action("GET", {"object": o})])
 
 
@@ -128,6 +156,8 @@ def give() -> tuple[str, list[Action]]:
         f"hand {o} to {r}",
         f"hand {r} {o}",
         f"take {o} to {r}",
+        f"pass {r} {o}",
+        f"deliver {o} to {r}",
     ]), [Action("GIVE", {"object": o, "recipient": r})])
 
 
@@ -135,6 +165,7 @@ def stop() -> tuple[str, list[Action]]:
     return (random.choice([
         "stop", "halt", "stop what you're doing", "cancel",
         "stop now", "quit it", "knock it off", "abort",
+        "stop everything", "freeze", "enough", "stop that",
     ]), [Action("STOP", {})])
 
 
@@ -168,6 +199,8 @@ def wakeup() -> tuple[str, list[Action]]:
         f"go wake up {r}",
         f"go and wake {r}",
         f"wake {r} up",
+        f"go wake {r} up",
+        f"please wake up {r}",
     ]), [Action("WAKEUP", {"recipient": r})])
 
 
