@@ -9,9 +9,11 @@
 #   4. merges LoRA -> 2-bit -> robot.cact deployable
 #   5. evaluates the built model and prints final accuracy results
 #
-# Verified working config on a 16GB M3 Pro:
+# Tuned for a 36GB M3 Pro (batch 8 OOM-killed on 16GB during XLA compile,
+# so 16 on 36GB keeps ~2x headroom for the compile spike):
 #   - JAX_PLATFORMS must be UPPERCASE 'METAL' (lowercase errors out)
-#   - batch-size 4 REQUIRED: 8+ OOM-kills (SIGKILL) during XLA compile
+#   - batch-size 16 default; if you ever hit SIGKILL/OOM, drop via BATCH_SIZE=8
+#     (note: batches <16 print a cosmetic 'loss 0.0000', >=16 prints real loss)
 #   - max-len 192 (commands are short; 1024 wastes memory)
 #   - close Ollama/other big apps first: they hold GBs of RAM
 #
@@ -20,11 +22,12 @@
 #   DATA=data/finetune/train.jsonl EPOCHS=5 ./finetune/train_mac.sh
 #
 # overrides:
-#   DATA      dataset jsonl          (default data/finetune/train_v2.jsonl)
-#   OUT       LoRA output pkl        (default checkpoints/needle_lora_v2.pkl)
-#   CACT      built deployable       (default robot.cact)
-#   EPOCHS    training epochs        (default 10)
-#   EVAL_N    examples to eval       (default 200)
+#   DATA       dataset jsonl         (default data/finetune/train_v2.jsonl)
+#   OUT        LoRA output pkl       (default checkpoints/needle_lora_v2.pkl)
+#   CACT       built deployable      (default robot.cact)
+#   EPOCHS     training epochs       (default 10)
+#   BATCH_SIZE train batch size      (default 16 for 36GB RAM)
+#   EVAL_N     examples to eval      (default 200)
 #   SKIP_TRAIN=1  skip straight to build+eval using existing OUT
 # =============================================================================
 set -e
@@ -37,6 +40,7 @@ OUT=${OUT:-checkpoints/needle_lora_v2.pkl}
 CACT=${CACT:-robot.cact}
 BASE=${BASE:-checkpoints/needle2.pkl}
 EPOCHS=${EPOCHS:-10}
+BATCH_SIZE=${BATCH_SIZE:-16}
 EVAL_N=${EVAL_N:-200}
 VENV=${VENV:-$HOME/p3.11}
 
@@ -79,14 +83,17 @@ echo "ollama stopped (if it was running)"
 
 # ---------------------------------------------------------------- 3. train
 if [ "${SKIP_TRAIN:-0}" != "1" ]; then
-  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs)"
+  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE)"
   echo "    loss should start around 2-4 and drop. batch<16 may print cosmetic"
   echo "    'loss 0.0000' lines - that is a known display quirk, not a failure."
+  if [ "$BATCH_SIZE" -lt 16 ]; then
+    echo "    NOTE: batch<16 -> printed loss is cosmetic 0.0000 (known quirk)."
+  fi
   JAX_PLATFORMS=METAL needle finetune "$DATA" \
     --epochs "$EPOCHS" \
     --val-split 0.1 \
     --max-len 192 \
-    --batch-size 4 \
+    --batch-size "$BATCH_SIZE" \
     --out "$OUT"
 else
   step "[3/5] SKIP_TRAIN=1 -> reusing existing $OUT"
