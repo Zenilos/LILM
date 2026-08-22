@@ -133,8 +133,9 @@ BOARD
 **Exit:** `data/finetune/train.jsonl` + tests.
 
 ### Phase 4 — Fine-tune + build (Mac)
-- `needle finetune` (watch val loss each epoch; see doc/finetuning.md for sizing).
-- `needle build ... --bits 2 --out robot.cact`.
+- `needle finetune` — verified recipe in `finetune/run_finetune.sh`: `JAX_PLATFORMS=METAL --max-len 192 --batch-size 4` (batch ≥ 8 OOM-kills on 16 GB; stop Ollama first; CPU works but slow). Watch val loss each epoch.
+- NOTE: at batch-size 4 the CLI prints `loss 0.0000` — appears cosmetic; verify empirically by building an intermediate `.cact` mid-run and testing outputs.
+- `needle build checkpoints/needle2.pkl --lora ... --bits 2 --out robot.cact`.
 - Smoke-test `robot.cact` with `needle playground --weights robot.cact` on 50 commands.
 
 **Exit:** `robot.cact` behaves on host Python.
