@@ -1,0 +1,24 @@
+[
+  {
+    "name": "robot_action",
+    "description": "Execute one atomic robot action. Call once per action, in execution order. Omit slot fields that the command does not mention.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "type": "string",
+          "enum": ["MOVE", "CLEAN", "PLAY", "SHOW", "GET", "GIVE", "STOP", "WAIT", "WAKEUP"],
+          "description": "MOVE go to a place; CLEAN vacuum/mop a place; PLAY play an sdcard file; SHOW display a message; GET pick up an object; GIVE hand an object to someone; STOP halt everything; WAIT pause for a duration; WAKEUP go wake a person"
+        },
+        "location": {"type": "string", "description": "place: kitchen, my room, here, garage, where I cook"},
+        "object": {"type": "string", "description": "physical thing: cup, red ball, the plant"},
+        "recipient": {"type": "string", "description": "person receiving or being woken: John, my wife, the kids"},
+        "file": {"type": "string", "description": "sdcard filename: song.mp3, alarm.wav"},
+        "duration": {"type": "string", "description": "as spoken: 5 seconds, five minutes, half an hour"},
+        "message": {"type": "string", "description": "text to display"},
+        "person": {"type": "string", "description": "person the message is for"}
+      },
+      "required": ["intent"]
+    }
+  }
+]

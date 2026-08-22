@@ -73,10 +73,10 @@ MAC ─ dataset factory
   schema/dsl.py            Action dataclass, intents, normalize(), match()
   generator/*              canonical templates → synonyms → light typos
                            → compounds (stored boundaries) → off-topic
-  teacher/validate.py      cactus-needle complete() sanity-check of generated
-                           data vs known labels (confidence gate, cached)
-  augment/openrouter.py    free OpenRouter models paraphrase seeds;
-                           every paraphrase passes the same validation
+  augment/validate.py      OpenRouter LLM (free models) sanity-checks
+                           generated text against known labels (PROBED:
+                           base Needle zero-shot is too weak to validate;
+                           see teacher/probe.py results)
         │
         ▼ convert to finetune JSONL
   {"query": "...", "tools": [<schema above>],
@@ -116,11 +116,12 @@ BOARD
 
 **Exit:** `data/generated/v1.jsonl`.
 
-### Phase 2 — Validation loop (Needle as filter, Mac)
-- One probe first: confirm base Needle handles our single-tool schema well; tune tool description wording if not (descriptions are load-bearing).
-- Validate generated set vs known labels, confidence-gated, all responses cached.
+### Phase 2 — LLM validation loop (OpenRouter, free models)
+- PROBE RESULT (teacher/probe.py): base Needle zero-shot fails slot filling in both single-tool and nine-tool modes (`go to my room` → MOVE with no location; `give John the cup` → wakeup). Base Needle cannot be the validator.
+- Use free OpenRouter models to check each generated example: does the text express exactly the known actions? Mismatch → reject/review.
+- Also confirmed by probe: multi-call responses work even with one declared tool — compounds are safe for the on-device design.
 
-**Exit:** ≥ 80% acceptance; disagreements inspected.
+**Exit:** validated `data/generated/v1.jsonl`, rejection rate logged.
 
 ### Phase 3 — OpenRouter augmentation (free models)
 - Paraphrase diversity beyond templates; same validation gate.
