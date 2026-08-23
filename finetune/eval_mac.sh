@@ -13,8 +13,8 @@ VENV=${VENV:-$HOME/p3.11}
 [ -f "$VENV/bin/activate" ] && source "$VENV/bin/activate"
 [ -f "$CACT" ] || { echo "missing $CACT"; exit 1; }
 [ -f "$DATA" ] || { echo "missing $DATA"; exit 1; }
-echo "==> evaluating $CACT on $EVAL_N examples from $DATA (METAL)"
-JAX_PLATFORMS=METAL python - "$CACT" "$DATA" "$EVAL_N" <<'PY'
+echo "==> evaluating $CACT on $EVAL_N examples from $DATA (native CPU engine; ~0.5s/example)"
+python - "$CACT" "$DATA" "$EVAL_N" <<'PY'
 import json, random, sys
 from collections import Counter
 from pathlib import Path

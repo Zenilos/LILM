@@ -103,8 +103,8 @@ JAX_PLATFORMS=cpu needle build "$BASE" --lora "$OUT" --bits 2 --out "$CACT"
 ls -lh "$CACT"
 
 # ---------------------------------------------------------------- 5. eval
-step "[5/5] evaluating $CACT on $EVAL_N examples from $DATA (override: EVAL_N=50 for quick)"
-JAX_PLATFORMS=METAL python - "$CACT" "$DATA" "$EVAL_N" <<'EOF'
+step "[5/5] evaluating $CACT on $EVAL_N examples from $DATA (native CPU engine; override: EVAL_N=50 for quick)"
+python - "$CACT" "$DATA" "$EVAL_N" <<'EOF'
 import json, random, sys
 from collections import Counter
 from pathlib import Path
