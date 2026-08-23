@@ -387,7 +387,7 @@ def finetune_local(args, progress=None):
             emit(f"  {'epoch':<9} {epoch + 1}/{args.epochs}  loss {last:.4f}")
 
         # quick eval on 5 examples in background — does not block next epoch
-        if os.environ.get("QUICK_EVAL", "1") != "0" and ((epoch + 1) % 2 == 0 or (epoch + 1) == args.epochs):
+        if os.environ.get("QUICK_EVAL", "1") != "0" and True:
             try:
                 import threading, json, random, sys as _sys
                 if os.getcwd() not in _sys.path: _sys.path.insert(0, os.getcwd())
