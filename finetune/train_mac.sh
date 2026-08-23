@@ -85,8 +85,8 @@ echo "ollama stopped (if it was running)"
 
 # ---------------------------------------------------------------- 3. train
 if [ "${SKIP_TRAIN:-0}" != "1" ]; then
-  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE, max-len $MAX_LEN)"
-  JAX_PLATFORMS=METAL needle finetune "$DATA" \
+  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE, max-len $MAX_LEN) + quick 5-shot every 2 epochs"
+  QUICK_EVAL=1 JAX_PLATFORMS=METAL needle finetune "$DATA" \
     --epochs "$EPOCHS" \
     --val-split 0.1 \
     --max-len "$MAX_LEN" \
