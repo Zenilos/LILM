@@ -43,7 +43,7 @@ BASE=${BASE:-checkpoints/needle2.pkl}
 EPOCHS=${EPOCHS:-10}
 BATCH_SIZE=${BATCH_SIZE:-8}
 MAX_LEN=${MAX_LEN:-512}
-EVAL_N=${EVAL_N:-200}
+EVAL_N=${EVAL_N:-50}
 VENV=${VENV:-$HOME/p3.11}
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -103,8 +103,8 @@ JAX_PLATFORMS=cpu needle build "$BASE" --lora "$OUT" --bits 2 --out "$CACT"
 ls -lh "$CACT"
 
 # ---------------------------------------------------------------- 5. eval
-step "[5/5] evaluating $CACT on $EVAL_N examples from $DATA"
-python - "$CACT" "$DATA" "$EVAL_N" <<'EOF'
+step "[5/5] evaluating $CACT on $EVAL_N examples from $DATA (override: EVAL_N=50 for quick)"
+JAX_PLATFORMS=METAL python - "$CACT" "$DATA" "$EVAL_N" <<'EOF'
 import json, random, sys
 from collections import Counter
 from pathlib import Path
