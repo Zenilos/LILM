@@ -84,13 +84,17 @@ pkill -x ollama 2>/dev/null || true
 echo "ollama stopped (if it was running)"
 
 # ---------------------------------------------------------------- 3. train
-# install patched finetune (background 5-shot every 2 epochs, non-blocking)
+# install patched finetune (file-signal quick eval, non-blocking) and start watcher
 if [ -f finetune/finetune_patched.py ]; then
   _dst=$(python -c "import needle.model.finetune, pathlib; print(pathlib.Path(needle.model.finetune.__file__))")
   cp finetune/finetune_patched.py "$_dst" 2>/dev/null || true
 fi
+rm -f checkpoints/.eval_trigger eval_quick.log
 if [ "${SKIP_TRAIN:-0}" != "1" ]; then
-  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE, max-len $MAX_LEN) + quick 5-shot every 2 epochs (bg, non-blocking)"
+  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE, max-len $MAX_LEN) + quick 5-shot every epoch (bg via eval_watcher.sh -> eval_quick.log)"
+  # start file-signal watcher in background (no threading in training)
+  OUT="$OUT" ./finetune/eval_watcher.sh > /tmp/eval_watcher.log 2>&1 &
+  echo $! > /tmp/eval_watcher.pid
   QUICK_EVAL=1 JAX_PLATFORMS=METAL needle finetune "$DATA" \
     --epochs "$EPOCHS" \
     --val-split 0.1 \
@@ -100,6 +104,9 @@ if [ "${SKIP_TRAIN:-0}" != "1" ]; then
 else
   step "[3/5] SKIP_TRAIN=1 -> reusing existing $OUT"
 fi
+# stop watcher if running
+if [ -f /tmp/eval_watcher.pid ]; then kill $(cat /tmp/eval_watcher.pid) 2>/dev/null || true; rm -f /tmp/eval_watcher.pid; fi
+if [ -f eval_quick.log ]; then echo "--- quick eval log (tail) ---"; cat eval_quick.log; fi
 ls -lh "$OUT"
 
 # ---------------------------------------------------------------- 4. build

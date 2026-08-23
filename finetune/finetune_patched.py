@@ -386,69 +386,20 @@ def finetune_local(args, progress=None):
         else:
             emit(f"  {'epoch':<9} {epoch + 1}/{args.epochs}  loss {last:.4f}")
 
-        # quick eval on 5 examples in background — does not block next epoch
-        if os.environ.get("QUICK_EVAL", "1") != "0" and True:
+        # signal eval watcher via files — does not block training
+        if os.environ.get("QUICK_EVAL", "1") != "0":
             try:
-                import threading, json, random, sys as _sys
-                if os.getcwd() not in _sys.path: _sys.path.insert(0, os.getcwd())
-                # snapshot lora so training can continue while eval builds
-                _snap = {k: {"A": np.array(v["A"]), "B": np.array(v["B"])} for k, v in lora.items()}
-                _snap_scale, _snap_epoch = float(scale), epoch + 1
-                _snap_base, _snap_data = base_path, data_path
-                _snap_out = args.out or os.path.join(args.checkpoint_dir, "needle_lora.pkl")
-                def _bg_quick(_snap=_snap, _snap_scale=_snap_scale, _snap_epoch=_snap_epoch, _snap_base=_snap_base, _snap_data=_snap_data, _snap_out=_snap_out):
-                    try:
-                        import pickle as _pk, json as _js, random as _rd, os as _os
-                        _tmp_lora = os.path.join(os.path.dirname(_snap_out), f".tmp_lora_epoch{_snap_epoch}.pkl")
-                        os.makedirs(os.path.dirname(_tmp_lora), exist_ok=True)
-                        with open(_tmp_lora, "wb") as _h:
-                            _pk.dump({"lora": {"/".join(p): {"A": np.asarray(v["A"]), "B": np.asarray(v["B"])} for p, v in _snap.items()}, "scale": _snap_scale, "base": _snap_base, "rank": args.lora_rank}, _h)
-                        from needle.model.run import load_checkpoint as _lc
-                        from needle.model.export import write_export as _we
-                        from needle.model.tokenizer import get_tokenizer as _gt
-                        from needle.model.architecture import effective_kv_window as _ekv
-                        from needle.model.finetune import merge_lora as _ml
-                        _params, _cfg, _ = _lc(_snap_base, return_run=True)
-                        import jax.numpy as _jnp
-                        _lora_dict = {tuple(k.split("/")): {"A": _jnp.asarray(v["A"]), "B": _jnp.asarray(v["B"])} for k, v in _pk.load(open(_tmp_lora,"rb"))["lora"].items()}
-                        _merged = _ml(_params, _lora_dict, _snap_scale)
-                        _tmp_cact = _tmp_lora.replace(".pkl", ".cact")
-                        _we(_merged, _cfg, _tmp_cact, bits=2, bits_map=None, tokenizer=_gt(_cfg.vocab_size), kv_window=_ekv(_cfg))
-                        import needle as _needle
-                        _tools = _js.load(open("schema/tool_schema.json")) if os.path.exists("schema/tool_schema.json") else _js.load(open(os.path.join(os.path.dirname(_snap_data), "../../schema/tool_schema.json")))
-                        _agent = _needle.Needle(weights=_tmp_cact, tools=_tools, system="device: domestic robot; locale: en-US")
-                        _recs = [_js.loads(l) for l in open(_snap_data) if l.strip()]
-                        _rd.seed(42 + _snap_epoch)
-                        _sample = _rd.sample(_recs, min(5, len(_recs)))
-                        _ok = 0
-                        for _r in _sample:
-                            try:
-                                _resp = _agent.complete(_r["query"])
-                                _pred = []
-                                for _c in _resp.get("function_calls") or []:
-                                    _a = dict(_c.get("arguments") or {})
-                                    _pred.append({"intent": _a.pop("intent","?"), "slots": {k:v for k,v in _a.items()}})
-                                _gold = []
-                                for _a in _r.get("answers", []):
-                                    _ag = dict(_a.get("arguments") or {})
-                                    _intent = _ag.pop("intent","?")
-                                    try:
-                                        from schema.dsl import Action as _Act
-                                        _gold.append(_Act(intent=_intent, slots=_ag))
-                                    except: pass
-                                if _gold:
-                                    from schema.dsl import Action as _Act2, actions_match as _am
-                                    try:
-                                        _pa = [_Act2.from_dict(p) for p in _pred]
-                                        if _am(_pa, _gold): _ok+=1
-                                    except: pass
-                            except: pass
-                        emit(f"  {'quick':<9} {_snap_epoch}/{args.epochs}  5-shot {_ok}/5 = {100*_ok/5:.0f}% (bg)")
-                        try: os.remove(_tmp_lora); os.remove(_tmp_cact)
-                        except: pass
-                    except Exception as _e:
-                        emit(f"  {'quick':<9} skip ({_e})")
-                threading.Thread(target=_bg_quick, daemon=True).start()
+                import json as _js
+                _trigger_dir = os.path.dirname(args.out or os.path.join(args.checkpoint_dir, "needle_lora.pkl"))
+                os.makedirs(_trigger_dir, exist_ok=True)
+                _ckpt = os.path.join(_trigger_dir, f".tmp_lora_epoch{epoch+1}.pkl")
+                with open(_ckpt, "wb") as _h:
+                    pickle.dump({"lora": {"/".join(p): {"A": np.asarray(v["A"]), "B": np.asarray(v["B"])} for p, v in lora.items()}, "scale": float(scale), "base": base_path, "rank": args.lora_rank}, _h)
+                # write trigger file with epoch + paths for watcher
+                _trig = os.path.join(_trigger_dir, ".eval_trigger")
+                with open(_trig, "a") as _tf:
+                    _tf.write(f"{epoch+1} {_ckpt} {base_path} {data_path} {args.epochs}\n")
+                emit(f"  {'quick':<9} {epoch+1}/{args.epochs}  queued (watcher will log to eval_quick.log)")
             except Exception as _e:
                 emit(f"  {'quick':<9} skip ({_e})")
 
