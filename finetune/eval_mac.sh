@@ -46,6 +46,7 @@ for i, rec in enumerate(sample):
     try: pred_actions=[Action.from_dict(p) for p in pred] if pred is not None else None
     except ValueError: pred_actions=None
     m=actions_match(pred_actions, gold)
+    needle._lib().needle_reset()
     ok+=m
     for g in gold:
         per[g.intent]+=1

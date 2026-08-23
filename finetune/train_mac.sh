@@ -44,6 +44,7 @@ EPOCHS=${EPOCHS:-10}
 BATCH_SIZE=${BATCH_SIZE:-8}
 MAX_LEN=${MAX_LEN:-256}
 EVAL_N=${EVAL_N:-50}
+BITS=${BITS:-4}
 VENV=${VENV:-$HOME/p3.11}
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -110,8 +111,12 @@ if [ -f eval_quick.log ]; then echo "--- quick eval log (tail) ---"; cat eval_qu
 ls -lh "$OUT"
 
 # ---------------------------------------------------------------- 4. build
-step "[4/5] merging LoRA -> 2-bit quantized deployable: $CACT"
-JAX_PLATFORMS=cpu needle build "$BASE" --lora "$OUT" --bits 2 --out "$CACT"
+# BITS=4 required: 2-bit quant destroys the LoRA fine-tune (model loops, wrong
+# intents -> "token budget exhausted" / []). Verified: float32 JAX greedy is
+# perfect on the same weights; b4 engine matches it; b2 and attn-only-mixed
+# do NOT. NOTE: b4 cact is ~23MB — over 16MB ESP32 flash, size work is open.
+step "[4/5] merging LoRA -> ${BITS}-bit quantized deployable: $CACT"
+JAX_PLATFORMS=cpu needle build "$BASE" --lora "$OUT" --bits "$BITS" --out "$CACT"
 ls -lh "$CACT"
 
 # ---------------------------------------------------------------- 5. eval
@@ -171,6 +176,9 @@ for i, rec in enumerate(sample):
         pred_actions = None
     match = actions_match(pred_actions, gold)
     ok += match
+    # reset conversation state: reusing context across queries degrades output
+    # to [] (budget exhaustion). Verified safe: reset == fresh agent quality.
+    needle._lib().needle_reset()
     for g in gold:
         per_intent[g.intent] += 1
         if match:
