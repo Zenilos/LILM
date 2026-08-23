@@ -84,8 +84,13 @@ pkill -x ollama 2>/dev/null || true
 echo "ollama stopped (if it was running)"
 
 # ---------------------------------------------------------------- 3. train
+# install patched finetune (background 5-shot every 2 epochs, non-blocking)
+if [ -f finetune/finetune_patched.py ]; then
+  _dst=$(python -c "import needle.model.finetune, pathlib; print(pathlib.Path(needle.model.finetune.__file__))")
+  cp finetune/finetune_patched.py "$_dst" 2>/dev/null || true
+fi
 if [ "${SKIP_TRAIN:-0}" != "1" ]; then
-  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE, max-len $MAX_LEN) + quick 5-shot every 2 epochs"
+  step "[3/5] fine-tuning on METAL: $DATA ($EPOCHS epochs, batch $BATCH_SIZE, max-len $MAX_LEN) + quick 5-shot every 2 epochs (bg, non-blocking)"
   QUICK_EVAL=1 JAX_PLATFORMS=METAL needle finetune "$DATA" \
     --epochs "$EPOCHS" \
     --val-split 0.1 \
