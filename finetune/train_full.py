@@ -32,10 +32,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/finetune/train_v2.jsonl")
     ap.add_argument("--base", default="checkpoints/needle2.pkl")
+    ap.add_argument("--init", default="", help="start from a full-FT checkpoint instead of --base")
     ap.add_argument("--out", default="checkpoints/full_v1.pkl")
     ap.add_argument("--cact", default="")
     ap.add_argument("--bits", type=int, default=4, help="export bits for --cact")
     ap.add_argument("--qat", type=int, default=0, help="train-time weight-quant sim width (0=off)")
+    ap.add_argument("--aqat", action="store_true",
+                    help="activation+KV+weight QAT via the package's built-in quant path "
+                         "(mirrors engine W%dA8/KV8 exactly)" % 4)
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-len", type=int, default=256)
@@ -57,6 +61,10 @@ def main():
     emit = lambda m: print(m, flush=True)
 
     params, cfg = load_checkpoint(args.base)
+    if args.init:
+        init = pickle.load(open(args.init, "rb"))["params"]
+        params = jax.tree.map(lambda a, b: jnp.asarray(b), params, init, is_leaf=lambda x: x is None or not isinstance(x, dict))
+        emit(f"  {'init':<9} {args.init}")
     cfg.dtype = "float32"
     params = jax.tree.map(lambda a: np.asarray(a).astype(np.float32), params)
     backend = jax.default_backend().lower()
@@ -102,6 +110,15 @@ def main():
 
     # ---- QAT (STE): forward uses cq-quantized weights, gradients flow straight
     qat_bits = args.qat or 0
+    if args.aqat:
+        from needle.model import quantize as _q
+        _q.KV_BITS = 8          # match engine KV-cache width
+        _q.ACT_BITS = 8         # engine activation width (default already 8)
+        emit(f"  {'aqat':<9} enabled: act A8 + kv8 fake-quant in forward")
+
+    def ste(params_tree):
+        if not qat_bits:
+            return params_tree
 
     def ste(params_tree):
         if not qat_bits:
@@ -116,7 +133,7 @@ def main():
         return jax.tree_util.tree_map_with_path(fn, params_tree)
 
     def loss_fn(p, ids, mask):
-        logits = model.apply({"params": ste(p)}, ids)
+        logits = model.apply({"params": ste(p)}, ids, quant=bool(args.aqat))
         logits, targets, mask = logits[:, :-1], ids[:, 1:], mask[:, 1:]
         ce = optax.softmax_cross_entropy_with_integer_labels(logits, targets)
         return (ce * mask).sum() / jnp.maximum(mask.sum(), 1.0)
