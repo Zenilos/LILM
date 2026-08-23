@@ -10,6 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 SLOT_KEYS = ["location", "object", "recipient", "file",
              "duration_amount", "duration_unit", "message", "person"]
 
+# MUST match what the runtime sends (needle.Needle(system=...)) — a mismatch
+# between train-time and infer-time system block silently degrades the
+# fine-tune back to base-model behavior.
+SYSTEM = "device: domestic robot; locale: en-US"
+
 
 def example_to_answer(action: dict) -> dict:
     args = {"intent": action["intent"]}
@@ -40,6 +45,7 @@ def convert(records: list[dict], tool_schema: list[dict]) -> list[dict]:
             "query": r["text"],
             "tools": tools_compact,
             "answers": answers,
+            "system": SYSTEM,
         }
         if answers and answers != [{"name": "robot_action", "arguments": {"intent": "UNAVAILABLE"}}]:
             rec["reasoning"] = reasoning_for(r["text"], actions)
