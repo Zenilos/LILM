@@ -20,12 +20,29 @@ Fine-tune Needle 2 (90 MB, `cactus-needle` 2.0.9, `checkpoints/needle2.pkl`) to 
 - Inference still `0/5` (seed 42): all `got: []` or `UNAVAILABLE` or `truncated`. Raw `a.complete("go to kitchen")` with new compact cact gives `UNAVAILABLE` or `tool call truncated` even for `hi` (176+16). Manual rebuild of same LoRA with `write_export(..., kv 256/512/1024)` also gives `UNAVAILABLE` (not truncated for kv 256, but wrong intent).
 - Toy (60 examples, verbose) also 0% and malformed JSON: `PLAY` with `location` instead of `file`, e.g. `{"intent":"PLAY","message":"","location":"beep.wav"}`.
 
-## Hypotheses for Next AI
-1. **Slot mapping bug**: model predicts `location` for `PLAY` — check `to_needle_jsonl.py` `example_to_answer` / `SLOT_KEYS` and whether compact schema dropped `description` needed for disambiguation.
-2. **Reasoning field**: training target is `<think>reasoning</think><tool_call>answers</tool_call>`. Reasoning is 3004/3297. Maybe model learns to emit reasoning but inference expects no reasoning, or reasoning length pushes budget.
-3. **Tokenizer / `render_example` mismatch**: training prompt is `IM_START user TOOLS_START tools_json TOOLS_END query IM_END IM_START assistant` — verify `needle` inference builds identical prompt (system handling).
-4. **LoRA merge / quant**: `merge_lora` scale 2.0, bits 2 — try `bits 4` or no quant to rule out destruction. Manual `bits 2` vs `needle build --bits 2` gave different MD5s (b514 vs 8512) — investigate `bits_map`.
-5. **Overfit test**: toy should overfit 60 examples to >90% if pipeline is correct — it doesn't, so pipeline is broken, not data size.
+## RESOLVED (Aug 23 evening) — actual root causes
+1. **Model/training was NEVER broken.** Float32 JAX greedy decode from `render_example` prompt with merged LoRA produces PERFECT output (`<think>...</think><tool_call>[{"name":"robot_action","arguments":{"intent":"MOVE","location":"kitchen"}}]</tool_call>`). Diagnostic script pattern: load params+LoRA, `merge_lora`, `SimpleAttentionNetwork.apply`, greedy argmax.
+2. **Root cause A — 2-bit export destroys the fine-tune.** Engine at `--bits 2`: loops/wrong intents/"token budget exhausted"/[]. At `bits=4` (23.2 MB): matches float32 behavior. 3-bit (17.8 MB) and attn-only-4-bit mixed (19.4 MB): intermediate degradation — intents flip to UNAVAILABLE, slots survive. LoRA delta is not quantization-aware (base was QAT'd for its own map; fine-tune in float32 leaves that manifold).
+3. **Root cause B — agent reuse poisons eval.** Calling `complete()` repeatedly on one `Needle` accumulates context -> later queries return [] (budget death). FIX (verified): `needle._lib().needle_reset()` after each query == fresh-agent quality. Both `train_mac.sh` and `eval_mac.sh` patched (commit b1c7f64).
+4. **Engine is deterministic** (5 identical runs) — not sampling noise.
+5. Current `checkpoints/needle_lora_v2.pkl` (16:41, compact, 3 epochs, batch 8): float32 truth = 5/7 perfect, `tidy up the living room`->MOVE (should be CLEAN), `do you love me`->MOVE (should be UNAVAILABLE) — undertrained, hence the fresh 10-epoch run.
+
+## In flight
+- `nohup env EPOCHS=10 BATCH_SIZE=4 MAX_LEN=256 EVAL_N=50 ./finetune/train_mac.sh > /tmp/train_run.log` on this Mac (M1 16GB, batch 4 for RAM safety), started 17:26, ~3h ETA. Builds BITS=4 cact and runs eval-with-reset automatically.
+- Size problem OPEN: b4 = 23 MB > 16 MB ESP32 flash. Options to explore: QAT (quantization-aware finetune), ternary for MLP + 4-bit attn, prune layers, or ship b3 if more training widens margins enough (re-test ladder after 10-epoch).
+
+## Verification commands (after training)
+```bash
+tail -f /tmp/train_run.log          # progress
+python3 - <<'PY'
+import json, needle
+a=needle.Needle(weights='robot.cact', tools=json.load(open('schema/tool_schema.json')), system="device: domestic robot; locale: en-US")
+for q in ["go to kitchen","play audio lullaby.mp3","tidy up the living room","vacuum the balcony","do you love me","please hold on for 30 minutes","fetch teh glasses right now"]:
+    r=a.complete(q); print(q, '->', r.get('function_calls'), r.get('error')); needle._lib().needle_reset()
+PY
+./finetune/eval_mac.sh              # 50 examples, reset between queries
+```
+
 
 ## How to Reproduce
 ```bash
