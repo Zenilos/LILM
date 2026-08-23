@@ -11,10 +11,11 @@
 #
 # Tuned for a 36GB M3 Pro:
 #   - JAX_PLATFORMS must be UPPERCASE 'METAL' (lowercase errors out)
-#   - max-len 1024 (prompt+tools is ~419 toks + target ~50 toks = 470; buckets to 512;
-#     192 truncates the entire target -> mask 0.0 -> loss 0.0000 and 0% accuracy)
-#   - batch-size 8 default for seq 512: 8*512 ~= 16*192*1.3, safe on 36GB;
-#     if SIGKILL/OOM, drop to 4 (or raise for speed if you have headroom)
+#   - max-len 512 (prompt+tools ~419 toks + target ~50 toks = ~470 tokens;
+#     buckets to 512; 192 truncated the entire target -> mask 0 -> loss 0.0000
+#     and 0% accuracy; 1024 buckets to 1024, 2x compile cost for no benefit)
+#   - batch-size 8 default for seq 512: 8*512 is ~2x 192*16 but fits on 36GB;
+#     if SIGKILL/OOM, drop to 4 (if compiling stalls >15 min, also try MAX_LEN=512)
 #   - close Ollama/other big apps first: they hold GBs of RAM
 #
 # usage:
@@ -41,7 +42,7 @@ CACT=${CACT:-robot.cact}
 BASE=${BASE:-checkpoints/needle2.pkl}
 EPOCHS=${EPOCHS:-10}
 BATCH_SIZE=${BATCH_SIZE:-8}
-MAX_LEN=${MAX_LEN:-1024}
+MAX_LEN=${MAX_LEN:-512}
 EVAL_N=${EVAL_N:-200}
 VENV=${VENV:-$HOME/p3.11}
 
