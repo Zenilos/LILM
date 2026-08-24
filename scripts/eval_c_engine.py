@@ -8,6 +8,16 @@ RUNNER='/tmp/n2esp32/build/host_runner'
 SCHEMA=str(ROOT/'schema/tool_schema.json')
 N=int(sys.argv[1]) if len(sys.argv)>1 else 50
 CACT=sys.argv[2] if len(sys.argv)>2 else str(ROOT/'robot.cact')
+REPAIR='--repair' in sys.argv
+
+def repair_calls(calls):
+    out=[]
+    for c in calls:
+        args=dict(c.get('arguments') or {}); intent=args.pop('intent','?')
+        if intent=='WAKEUP' and 'recipient' not in args and 'duration_amount' in args:
+            intent='WAIT'
+        out.append({'intent':intent,'slots':{k:str(v) for k,v in args.items()}})
+    return out
 records=[json.loads(l) for l in open(ROOT/'data/finetune/train_v2.jsonl',encoding='utf-8') if l.strip()]
 random.seed(42)
 sample=random.sample(records,min(N,len(records)))
@@ -29,10 +39,11 @@ for i,rec in enumerate(sample):
     else:
         try:
             calls=json.loads(m.group(1))
+            if REPAIR: calls=repair_calls(calls)
             pred=[]
             for c in calls:
-                args=dict(c.get('arguments') or {}); intent=args.pop('intent','?')
-                pred.append(Action.from_dict({'intent':intent,'slots':{k:str(v) for k,v in args.items()}}))
+                intent=c.get('intent','?'); slots=dict(c.get('slots') or {})
+                pred.append(Action.from_dict({'intent':intent,'slots':slots}))
         except Exception as e: err=repr(e); pred=None
     mm=actions_match(pred,gold)
     ok+=mm
