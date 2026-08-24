@@ -12,10 +12,10 @@ Estimate: v2a 2–4 days · v2b 3–5 days
 - **Deterministic output repair** closes most of that gap with zero ML risk:
   a post-parser rule on device — `WAKEUP without recipient + duration_amount
   ⇒ rewrite intent to WAIT` (such outputs are illegal per schema anyway).
-  Counterfactual scoring: **76% → 86%** on the 50-query harness; confirm at
-  200 queries before ship. Implemented as `--repair` in
-  `scripts/eval_c_engine.py`; the same ~10 lines go into the demo's
-  tool-call parser.
+  Counterfactual scoring: **76% → 86%** on the 50-query harness; **confirmed
+  177/200 = 88.5% at 200 queries** with `--repair`
+  (`/tmp/eval_t4_repair_200.txt`; WAIT 31/33, CLEAN 18/18). Remaining misses
+  are slot-value noise on rare tokens and a few truncated compounds.
 - Retraining does NOT reliably buy quantization quality. Evidence:
   plain FT continuation of full_v1 on augmented data moved fp32 val CE to
   0.0000 while its t4-quantized accuracy bounced 8% → 24% → 14% → 0%
