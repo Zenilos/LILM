@@ -120,7 +120,9 @@ def main():
         bits_map, map_default = parse_bits_map(args.bits_map)
         if not qat_bits:
             qat_bits = -1          # mixed-width QAT keyed off the map
-        emit(f"  {'bits-map':<9} {args.bits_map}")
+        emit(f"  {'bits-map':<9} {args.bits_map}"
+             + ("  (implies mixed-width QAT; pass no --bits-map for plain FT)"
+                if not args.qat else ""))
     if args.aqat:
         from needle.model import quantize as _q
         _q.KV_BITS = 8          # match engine KV-cache width
