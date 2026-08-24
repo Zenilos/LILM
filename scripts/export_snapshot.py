@@ -23,7 +23,7 @@ def main():
 
     import pickle
 
-    from needle.model.architecture import TransformerConfig
+    from needle.model.architecture import TransformerConfig, effective_kv_window
     from needle.model.export import write_export
     from needle.model.tokenizer import get_tokenizer
 
@@ -34,7 +34,8 @@ def main():
     info = write_export(jax.tree.map(lambda a: jax.numpy.asarray(a), params),
                         cfg, args.out,
                         bits=args.bits if args.bits_map is None else 4,
-                        bits_map=args.bits_map, tokenizer=tok)
+                        bits_map=args.bits_map, tokenizer=tok,
+                        kv_window=effective_kv_window(cfg))
     print(f"exported {info['path']}  {info['bytes'] / 1e6:.2f} MB")
 
 
