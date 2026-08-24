@@ -10,14 +10,16 @@ N=int(sys.argv[1]) if len(sys.argv)>1 else 50
 CACT=sys.argv[2] if len(sys.argv)>2 else str(ROOT/'robot.cact')
 REPAIR='--repair' in sys.argv
 
-def repair_calls(calls):
+def parse_calls(calls):
     out=[]
     for c in calls:
         args=dict(c.get('arguments') or {}); intent=args.pop('intent','?')
-        if intent=='WAKEUP' and 'recipient' not in args and 'duration_amount' in args:
+        if (REPAIR and intent=='WAKEUP' and 'recipient' not in args
+                and 'duration_amount' in args):
             intent='WAIT'
-        out.append({'intent':intent,'slots':{k:str(v) for k,v in args.items()}})
-    return out
+        try: out.append(Action.from_dict({'intent':intent,'slots':{k:str(v) for k,v in args.items()}}))
+        except ValueError: return None
+    return out or None
 records=[json.loads(l) for l in open(ROOT/'data/finetune/train_v2.jsonl',encoding='utf-8') if l.strip()]
 random.seed(42)
 sample=random.sample(records,min(N,len(records)))
@@ -38,12 +40,7 @@ for i,rec in enumerate(sample):
     if not m: err='no tool_call'
     else:
         try:
-            calls=json.loads(m.group(1))
-            if REPAIR: calls=repair_calls(calls)
-            pred=[]
-            for c in calls:
-                intent=c.get('intent','?'); slots=dict(c.get('slots') or {})
-                pred.append(Action.from_dict({'intent':intent,'slots':slots}))
+            pred=parse_calls(json.loads(m.group(1)))
         except Exception as e: err=repr(e); pred=None
     mm=actions_match(pred,gold)
     ok+=mm
