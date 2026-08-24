@@ -46,6 +46,8 @@ def main():
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-len", type=int, default=256)
     ap.add_argument("--lr", type=float, default=2e-4)
+    ap.add_argument("--snapshot", default="/tmp/full_epoch_snapshot.pkl",
+                    help="rolling per-epoch checkpoint (overwritten each epoch)")
     ap.add_argument("--val-split", type=float, default=0.1)
     ap.add_argument("--strip-reasoning", action="store_true")
     ap.add_argument("--max-steps", type=int, default=0, help="smoke-test cap")
@@ -181,6 +183,10 @@ def main():
                                        jnp.asarray(val_masks[i:i + args.batch_size])))
                        for i in range(0, n_val, args.batch_size)]) if n_val else float("nan")
         emit(f"  {'epoch':<9} {epoch + 1}/{args.epochs}  loss {last:.4f}  val {val:.4f}  [{time.time()-t0:.0f}s]")
+        with open(args.snapshot, "wb") as fh:
+            pickle.dump({"params": jax.device_get(params), "config": vars(cfg),
+                         "meta": {"base": args.base, "full": True,
+                                  "epoch": epoch + 1}}, fh)
         if args.max_steps and step_i >= args.max_steps:
             break
 

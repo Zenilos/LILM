@@ -5,8 +5,9 @@ ROOT=Path('/Users/M2/codes/esp32/LILM_V1')
 sys.path.insert(0,str(ROOT)); sys.path.insert(0,str(ROOT/'schema'))
 from dsl import Action, actions_match
 RUNNER='/tmp/n2esp32/build/host_runner'
-CACT=str(ROOT/'robot.cact'); SCHEMA=str(ROOT/'schema/tool_schema.json')
+SCHEMA=str(ROOT/'schema/tool_schema.json')
 N=int(sys.argv[1]) if len(sys.argv)>1 else 50
+CACT=sys.argv[2] if len(sys.argv)>2 else str(ROOT/'robot.cact')
 records=[json.loads(l) for l in open(ROOT/'data/finetune/train_v2.jsonl',encoding='utf-8') if l.strip()]
 random.seed(42)
 sample=random.sample(records,min(N,len(records)))

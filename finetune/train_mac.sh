@@ -171,6 +171,7 @@ for i, rec in enumerate(sample):
                          "slots": {k: v for k, v in args.items()}})
         err = None
     try:
+        for p in (pred or []): p["slots"] = {k: str(v) for k, v in p["slots"].items()}
         pred_actions = [Action.from_dict(p) for p in pred] if pred is not None else None
     except ValueError:
         pred_actions = None

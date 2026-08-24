@@ -43,6 +43,7 @@ for i, rec in enumerate(sample):
         err=None
     except Exception as e:
         pred=None; err=repr(e)
+    for p in (pred or []): p["slots"]={k:str(v) for k,v in p["slots"].items()}
     try: pred_actions=[Action.from_dict(p) for p in pred] if pred is not None else None
     except ValueError: pred_actions=None
     m=actions_match(pred_actions, gold)
