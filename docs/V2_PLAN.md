@@ -18,8 +18,9 @@ Estimate: v2a 2–4 days · v2b 3–5 days
   tool-call parser.
 - Retraining does NOT reliably buy quantization quality. Evidence:
   plain FT continuation of full_v1 on augmented data moved fp32 val CE to
-  0.0000 while its t4-quantized accuracy bounced 8% → 24% → 14% across
-  epochs. PTQ at 2/3-bit is chaotic in the weights: full_v1 was a lucky
+  0.0000 while its t4-quantized accuracy bounced 8% → 24% → 14% → 0%
+  across five epochs (run `full_v6_aug`, checkpoints/full_v6_aug.pkl).
+  PTQ at 2/3-bit is chaotic in the weights: full_v1 was a lucky
   draw, and tiny (<6% relative) weight drift re-rolls it.
 
 ## Motivation
