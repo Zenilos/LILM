@@ -36,6 +36,8 @@ def main():
     ap.add_argument("--out", default="checkpoints/full_v1.pkl")
     ap.add_argument("--cact", default="")
     ap.add_argument("--bits", type=int, default=4, help="export bits for --cact")
+    ap.add_argument("--bits-map", default=None,
+                    help='per-tensor widths, e.g. "embedding=4,stack/mhc_phi_pre=4,default=2"')
     ap.add_argument("--qat", type=int, default=0, help="train-time weight-quant sim width (0=off)")
     ap.add_argument("--aqat", action="store_true",
                     help="activation+KV+weight QAT via the package's built-in quant path "
@@ -110,6 +112,13 @@ def main():
 
     # ---- QAT (STE): forward uses cq-quantized weights, gradients flow straight
     qat_bits = args.qat or 0
+    bits_map, map_default = (None, None)
+    if args.bits_map:
+        from needle.model.quantize import parse_bits_map
+        bits_map, map_default = parse_bits_map(args.bits_map)
+        if not qat_bits:
+            qat_bits = -1          # mixed-width QAT keyed off the map
+        emit(f"  {'bits-map':<9} {args.bits_map}")
     if args.aqat:
         from needle.model import quantize as _q
         _q.KV_BITS = 8          # match engine KV-cache width
@@ -119,16 +128,14 @@ def main():
     def ste(params_tree):
         if not qat_bits:
             return params_tree
-
-    def ste(params_tree):
-        if not qat_bits:
-            return params_tree
-        from needle.model.quantize import _is_quant_leaf
+        from needle.model.quantize import _is_quant_leaf, _bits_for, leaf_name
         def fn(path, leaf):
             if not _is_quant_leaf(path, leaf):
                 return leaf
+            b = (_bits_for(leaf_name(path), bits_map, map_default)
+                 if bits_map is not None else qat_bits)
             q = jax.lax.stop_gradient(cq_quantize_params(
-                {"w": leaf}, qat_bits)["w"])
+                {"w": leaf}, b)["w"])
             return leaf + jax.lax.stop_gradient(q - leaf)
         return jax.tree_util.tree_map_with_path(fn, params_tree)
 
@@ -189,9 +196,10 @@ def main():
         from needle.model.export import write_export
         from needle.model.architecture import effective_kv_window
         info = write_export(jax.tree.map(lambda a: jnp.asarray(a), np_params), cfg, args.cact,
-                            bits=args.bits, bits_map=None,
+                            bits=args.bits, bits_map=args.bits_map,
                             tokenizer=tok, kv_window=effective_kv_window(cfg))
-        emit(f"  {'wrote':<9} {info['path']}  {info['bytes'] / 1e6:.2f} MB  W{args.bits}A8")
+        emit(f"  {'wrote':<9} {info['path']}  {info['bytes'] / 1e6:.2f} MB  "
+             f"{'map' if args.bits_map else f'W{args.bits}'}A8")
     emit(f"done [{time.time()-t0:.0f}s]")
 
 
