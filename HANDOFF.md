@@ -79,3 +79,45 @@ PY
 2. Try `needle build --bits 4` and eval to isolate quant.
 3. Log actual `render_example` prompt for a failing query vs what `Needle` sends.
 4. Consider regenerating `train_v2` without descriptions but keeping intents, or with even shorter schema.
+
+---
+
+# SESSION UPDATE (Aug 24, 2026): MYSTERY SOLVED — 99.5% THROUGH C ENGINE
+
+## TL;DR
+The fine-tuned model was perfect all along. The official native engine
+(`libneedle.dylib` 2.0.3) breaks during *generation* on our W4 blob even
+though its prefill matches JAX exactly. We vendored the independent
+`andrisgauracs/needle-2-esp32` C99 engine, found and fixed a real bug in it
+(LUT kernel hardcoded to the 2-bit codebook), and now score:
+
+    199/200 = 99.5% exact match (scripts/eval_c_engine.py)
+    Only miss: "wait for a minute" -> duration_amount=60/unit=minutes (model nuance)
+
+## Evidence chain (all verified this session)
+1. JAX float32 greedy on full_v1: perfect outputs incl UNAVAILABLE/compounds.
+2. JAX with engine numerics simulated (W4 weights + A8 activations + KV8): still perfect.
+3. Blob forensics: `ref_forward.py` (NumPy over raw blob bytes) == JAX == dylib step-1 logits; weight tensors bit-equal between read_export and C dequant (<=2e-4 fp16 noise); directory metadata identical to official needle2.cact except bits width.
+4. Official dylib on OFFICIAL needle2.cact: reproduces JAX exactly (get_weather/Paris) -> engine is faithful for base model.
+5. Official dylib on OUR robot.cact: step-1 top5 matches ([8042,-3.99],[6,-15.89],...), but generated text drifts into base dialect within a few tokens -> generation-path bug specific to finetuned blobs. Black box: only 4 exported symbols, NEEDLE_DEBUG gives only first-step top5.
+6. Independent C99 engine had the SAME symptom but is source-available. Stage-by-stage diff vs NumPy ref pinned divergence to engram k/v projections -> nd_cq_lut_build()/dot_group_lut2() hardcode cb[0:4] (2-bit) while our tensors are bits=4 -> every LUT-projected gemv was garbage. Upstream never sees it because official model ships CQ2 projections.
+7. Fix: branch on t->bits==2 at all LUT sites, else generic nd_cq_gemv(). Post-fix C == NumPy == JAX (8042:-4.44/-6/-17.19... vs ref max -4.3864).
+8. Full greedy generation through fixed engine = perfect calls; eval 50/50 then 199/200.
+
+## What this means practically
+- Deploy via the vendored C99 engine (third_party/needle2-esp32/). It builds
+  for ESP32-S3 upstream (their demo runs on-device; production quant ~13MB fits 16MB flash).
+- robot.cact (W4 uniform) is 23MB — too big for 16MB flash as-is. Options:
+  a) QAT retrain at lower width (--qat 3/2 + export bits matching), or
+  b) mixed-width export (embed/mhc stay 4, rest 2/3) — engines support per-tensor bits.
+- Official dylib bug: worth reporting to Cactus with evidence chain above.
+
+## Key files added
+- third_party/needle2-esp32/ (engine src patched, host_runner.c CLI, README with full patch notes)
+- scripts/eval_c_engine.py — N-query eval through the C engine (same seed-42 sample + actions_match scoring as eval_mac.sh)
+
+## Gotchas learned (zsh/shell/engine)
+- $(cat file) strips trailing newlines -> tokenizer count off-by-one; read files in-process.
+- nd_tok_encode adds dummy-prefix token; _ex(...,add_dummy=0) only for continuations after markers.
+- Engine debug: NEEDLE_DEBUG=1 dumps prefix/turn ids + first-step top5 (only step!).
+- ENGINE_VERSION is pinned "2.0.3" inside pip package 2.0.9 — no newer binary exists.
