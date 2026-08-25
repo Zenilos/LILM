@@ -572,7 +572,7 @@ static void engram_step(nd_model *m, uint32_t token)
                 }
                 acc ^= acc >> 15;
                 idx = acc % slots;
-                if (m->pos == 5 && dbg_on()) printf("EG s=%u table=%u idx=%u ok=%d\n", s, table, idx, ok);
+                if (m->pos == 5 && dbg_on()) printf("EG s=%u table=%u idx=%u ok=%d\n", (unsigned)s, (unsigned)table, (unsigned)idx, ok);
 
                 if (ok) {
                     nd_tensor *tt = &m->engram[s].tables;
@@ -581,7 +581,7 @@ static void engram_step(nd_model *m, uint32_t token)
                                       e + (size_t)table * sub);
                     if (m->pos == 5 && s == 0 && dbg_on())
                         printf("ROW t%u i%u: %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f\n",
-                               table, idx, e[table*sub+0], e[table*sub+1],
+                               (unsigned)table, (unsigned)idx, e[table*sub+0], e[table*sub+1],
                                e[table*sub+2], e[table*sub+3], e[table*sub+4],
                                e[table*sub+5], e[table*sub+6], e[table*sub+7]);
                 } else {

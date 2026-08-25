@@ -1,0 +1,10 @@
+# name,     type, subtype,  offset,    size
+# Robot build: the t4 mixed-width blob is 14,651,215 bytes and does not fit
+# upstream's 13.125 MB model partition, nor the 14.61 MB tail behind a full
+# 2 MB app slot (35,687 bytes short). The demo app needs ~1 MB, so the factory
+# slot shrinks to 1.625 MB and model takes everything up to exactly 16 MB.
+# Model: 0x1B0000..0x1000000 = 15,007,744 bytes (356 KB margin over the blob).
+nvs,        data, nvs,      0x9000,    0x6000
+phy_init,   data, phy,      0xf000,    0x1000
+factory,    app,  factory,  0x10000,   0x1A0000
+model,      data, 0x40,     0x1B0000,  0xE50000

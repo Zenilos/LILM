@@ -1,0 +1,20 @@
+[
+  {
+    "name": "robot_action",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "intent": {"type": "string", "enum": ["MOVE", "CLEAN", "PLAY", "SHOW", "GET", "GIVE", "STOP", "WAIT", "WAKEUP", "UNAVAILABLE"]},
+        "location": {"type": "string"},
+        "object": {"type": "string"},
+        "recipient": {"type": "string"},
+        "file": {"type": "string"},
+        "duration_amount": {"type": "number"},
+        "duration_unit": {"type": "string", "enum": ["seconds", "minutes", "hours"]},
+        "message": {"type": "string"},
+        "person": {"type": "string"}
+      },
+      "required": ["intent"]
+    }
+  }
+]
