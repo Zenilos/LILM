@@ -1,8 +1,8 @@
 # V2 Plan — Two Tracks to >90%: (a) Distilled Student, (b) Two-Board Cluster
 
-Status: planned (v1 ships first — see PROJECT_REPORT.md)
+Status: **v1 deployed on hardware** (see DEPLOYMENT.md) · v2 tracks planned
 Owner: TBD
-Estimate: v2a 2–4 days · v2b 3–5 days
+Estimate: v2a 2–4 days · v2b 3–5 days (+0.5 day shared: chain-depth data)
 
 ## V1 shipping position (context for everything below)
 
@@ -22,14 +22,44 @@ Estimate: v2a 2–4 days · v2b 3–5 days
   across five epochs (run `full_v6_aug`, checkpoints/full_v6_aug.pkl).
   PTQ at 2/3-bit is chaotic in the weights: full_v1 was a lucky
   draw, and tiny (<6% relative) weight drift re-rolls it.
+- **Shipped**: t4 blob + repair rule running on the DevKitC-1
+  (`docs/DEPLOYMENT.md`, commit `7779dd9`); smoke tests passed on board.
+
+## Post-deployment findings (hardware + W4-vs-t4 comparison)
+
+Live tests with hard queries, comparing the deployed t4 blob against the
+full-quality W4 export (`robot.cact`, same teacher weights) on the Mac:
+
+| Failure class | t4 deployed | W4 teacher | Diagnosis |
+|---|---|---|---|
+| Rare-token slot garbling ("my daughter" → "my mom", "momentumianian") | ✗ | ✓ correct | Quantization damage → both v2 tracks fix |
+| 5–6 action chains: truncation, degenerate MOVE repeats, dropped hops | ✗ | ✗ **still fails** | Training distribution — corpus compounds max at ~2–3 calls |
+
+Consequences for the plan below:
+
+1. **Chain-depth data workstream (shared, both tracks):** scale the synthetic
+   generator to compounds of depth 4–6 with distractor clauses and
+   coreference ("she is at my desk"), then regenerate the fine-tune set and
+   distillation set from it. Cheap (~0.5 day), independent of hardware track,
+   and required for the product to accept natural multi-step commands. The
+   W4 teacher must pass extended chain evals BEFORE distilling (v2a), or the
+   student inherits the gap.
+2. **v2b's value proposition widens:** it removes quantization slot-noise
+   without retraining; combined with (1) it is also the fastest route to
+   correct long chains, since the teacher only needs data, not architecture,
+   changes.
+3. On-board latency measured: ~1.28 s/token decode, ~40 s per short request;
+   prefix priming ≈ 168 s once per boot (cached). Long chains multiply token
+   counts — keep an eye on UX budgets when evaluating tracks.
 
 ## Motivation
 
 V1 kept the full 45M-param teacher and compressed via mixed-width quantization.
 The audit showed why that path has a hard ceiling:
 
-- Model flash partition on the ESP32-S3 N16R8 is **14.68 MB** (firmware owns the
-  first 2 MB; blob flashed at `0x210000`).
+- Model flash partition on the ESP32-S3 N16R8 is **14.68 MB** (firmware owns
+  the first 2 MB; v1 ended up at blob offset `0x1B0000` after the partition
+  repurpose — see DEPLOYMENT.md).
 - The byte distribution is dominated by d²-scaling kernels
   (q/gate/out = 21.2M params) plus vocab-sized tables (embedding + 2 engram
   tables = 12.6M params).
@@ -199,8 +229,12 @@ single-digit % of teacher on the task) at zero training cost.
 two-process seam shim). If the v2a surgery+distill prototype at 20 K samples
 holds ≥93% of teacher on the task → ship v2a (cheaper product). Otherwise →
 v2b, whose quality is guaranteed and whose risk is ordinary systems work.
-Either track replaces the t4+repair stopgap only when it beats it on the
-200-query harness.
+Either track replaces the deployed t4+repair build only when it beats it on
+the 200-query harness **and** the extended chain eval (depth 4–6 compounds).
+
+**Sequencing:** do the shared chain-depth data workstream first (it changes
+the fine-tune/distillation sets both tracks consume), then the two Step-0
+spikes, then commit to a track.
 
 ## Non-goals
 
