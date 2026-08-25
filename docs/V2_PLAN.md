@@ -236,6 +236,23 @@ the 200-query harness **and** the extended chain eval (depth 4–6 compounds).
 the fine-tune/distillation sets both tracks consume), then the two Step-0
 spikes, then commit to a track.
 
+## Open caveats (be honest with yourselves)
+
+1. **The 88.5% number samples from training data.** `eval_c_engine.py` draws
+   its N queries from `data/finetune/train_v2.jsonl`, so some fraction is
+   memorization, not generalization. FIRST task of v2: generate a frozen
+   held-out set (fresh generator seed, never trained on) and re-baseline both
+   the deployed artifact and every future candidate against it. Expect a drop;
+   size it before making track decisions on margins.
+2. **The ship blob exists in exactly three places** (repo root
+   `robot_t4.cact`, the flashed board, /tmp). Re-export from full_v1.pkl +
+   t4 map should be byte-identical (export is deterministic), but verify with
+   shasum after any tooling change — PTQ chaos means silent drift here would
+   masquerade as a model regression.
+3. **Repair-rule duplication**: the WAIT fix lives in two places (device C +
+   eval harness Python). They must stay semantically identical; there is no
+   test enforcing that today.
+
 ## Non-goals
 
 - No change to tokenizer, schema, prompt format, host tooling, or deployment
