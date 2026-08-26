@@ -135,17 +135,30 @@ flash; cutting at a layer boundary is a natural extension.
 
 ### Step 0 — Feasibility gate (10 minutes, decides everything)
 
-The `.cact` header carries `hada_n` (Hadamard width used by the mhc machinery)
-plus `mhc_lanes`, `engram_sub_dim`, etc. If `hada_n` must equal `d_model` AND be
-a power of two, d=384 is illegal and the plan pivots:
+### v2a: d_model=384 constraint check
 
-- Check `engine/src/nd_model.c`, `nd_cact.c`, and
-  `needle/model/architecture.py` for how `hada_n` is derived/constrained.
-- If constrained to pow2: fall back to d=256 (re-run size math; likely still
-  fits at W4 ≈ 7–8 MB but capability risk) or pivot the axis entirely
-  (vocab/table shrinking instead of width).
-- Also verify `TransformerConfig` → `write_export` → engine round-trip at the
-  new width using random weights before any training investment.
+The `.cact` header carries `mhc_lanes` (MHC lane count) and `head_dim`,
+NOT `hada_n`. The `next_pow2(d_model)` note in the engine is about a
+scratch buffer sizing, not a constraint on d_model itself. For d=384,
+next_pow2(384)=512 → buffer is simply padded, no functional impact.
+
+**Result: d=384 is feasible from the engine side.** Proceed with surgery.
+
+### v2b: two-board seam feasibility
+
+The engine's forward pass (`nd_model_step_hidden`) processes layers
+sequentially: each layer `block(m, li, u)` reads previous hidden state,
+writes next hidden state to `m->xh`. Layers are independent — only the
+previous hidden state is needed. Splitting at boundary L:
+
+- Board A: layers 0..L-1 → serialize `m->xh` (d_model floats: 2 KB at d=512)
+- Board B: receives hidden state, loads as input, runs layers L..end
+
+Serialization overhead: 2 KB per token, ESP-NOW can do 250 bytes/ms → 8 ms
+vs 1.28 s/token budget → negligible. Even WiFi easily fast enough.
+
+**Result: clean layer-boundary split architecturally supported.** Engineering
+cost = firmware surgery + radio sync + 2 images. Quality = exact teacher.
 
 ### Pipeline
 

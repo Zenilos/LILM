@@ -9,6 +9,9 @@ SCHEMA=str(ROOT/'schema/tool_schema.json')
 N=int(sys.argv[1]) if len(sys.argv)>1 else 50
 CACT=sys.argv[2] if len(sys.argv)>2 else str(ROOT/'robot.cact')
 REPAIR='--repair' in sys.argv
+EVAL_DATA=None
+for a in sys.argv:
+    if a.startswith('--eval-data='): EVAL_DATA=a.split('=',1)[1]
 
 def parse_calls(calls):
     out=[]
@@ -20,7 +23,8 @@ def parse_calls(calls):
         try: out.append(Action.from_dict({'intent':intent,'slots':{k:str(v) for k,v in args.items()}}))
         except ValueError: return None
     return out or None
-records=[json.loads(l) for l in open(ROOT/'data/finetune/train_v2.jsonl',encoding='utf-8') if l.strip()]
+if EVAL_DATA: records=[json.loads(l) for l in open(EVAL_DATA,encoding='utf-8') if l.strip()]
+else:         records=[json.loads(l) for l in open(ROOT/'data/finetune/train_v2.jsonl',encoding='utf-8') if l.strip()]
 random.seed(42)
 sample=random.sample(records,min(N,len(records)))
 def gold_actions(rec):
