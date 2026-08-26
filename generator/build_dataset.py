@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from generator.canonical import GENERATORS, OFF_TOPIC, give, move  # noqa: E402
+from generator.deep_chains import make_deep_compound              # noqa: E402
 from generator.noise import inject_typo, politize, synonym_variant  # noqa: E402
 from schema.dsl import Action, actions_match  # noqa: E402
 
@@ -45,7 +46,7 @@ def corrupt(text: str, rng: random.Random) -> str:
 
 
 def generate(n_atomic: int = 3000, n_compound: int = 800, n_offtopic: int = 300,
-             seed: int = 7) -> list[dict]:
+             n_deep: int = 600, seed: int = 7) -> list[dict]:
     rng = random.Random(seed)
     records: list[dict] = []
     seen: set[str] = set()
@@ -67,6 +68,10 @@ def generate(n_atomic: int = 3000, n_compound: int = 800, n_offtopic: int = 300,
         text, actions, bounds = make_compound(rng)
         text = corrupt(text, rng)
         add(text, actions, {"kind": "compound", "clause_lengths": bounds})
+
+    for _ in range(n_deep):
+        text, actions, meta = make_deep_compound(rng)
+        add(text, actions, meta)
 
     unavailable = OFF_TOPIC + UNAVAILABLE
     for t in unavailable:
