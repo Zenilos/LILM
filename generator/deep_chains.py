@@ -1,4 +1,4 @@
-"""Extended compound generator: depth 3–6 chains with coreference and distractors.
+"""Extended compound generator: depth 3–5 chains with coreference and distractors.
 Produces (query, actions, meta) tuples. Plug into build_dataset or standalone."""
 from __future__ import annotations
 import random
@@ -39,9 +39,9 @@ def _location_coref(loc: str) -> str:
     return PERSON_PRONOUNS.get(loc, loc)
 
 def make_deep_chain(rng: random.Random, depth: int = None) -> tuple[str, list[Action], dict]:
-    """Build a chain of 3–6 actions with coreference and distractors."""
+    """Build a chain of 3–5 actions with coreference and distractors."""
     if depth is None:
-        depth = rng.choice([3, 3, 4, 4, 5, 6])
+        depth = rng.choice([3, 3, 4, 4])
 
     gens = list(GENERATORS.keys())
     actions: list[Action] = []
@@ -97,7 +97,7 @@ def make_deep_chain(rng: random.Random, depth: int = None) -> tuple[str, list[Ac
     return full_text, actions, {"depth": depth, "kind": "deep-chain"}
 
 def make_deep_compound(rng: random.Random) -> tuple[str, list[Action], dict]:
-    """Top-level entry: random depth 3–6 chain with corruption."""
+    """Top-level entry: random depth 3–5 chain with corruption."""
     text, actions, meta = make_deep_chain(rng)
     r = rng.random()
     if r < 0.45:
