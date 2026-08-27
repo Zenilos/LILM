@@ -48,6 +48,8 @@ def main():
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--snapshot", default="/tmp/full_epoch_snapshot.pkl",
                     help="rolling per-epoch checkpoint (overwritten each epoch)")
+    ap.add_argument("--snapshot-every", type=int, default=0,
+                    help="also snapshot every N optimizer steps (crash resilience)")
     ap.add_argument("--val-split", type=float, default=0.1)
     ap.add_argument("--strip-reasoning", action="store_true")
     ap.add_argument("--max-steps", type=int, default=0, help="smoke-test cap")
@@ -168,6 +170,11 @@ def main():
 
     every = max(1, total // 50)
     step_i = 0
+    def write_snapshot(epoch, steps_done):
+        with open(args.snapshot, "wb") as fh:
+            pickle.dump({"params": jax.device_get(params), "config": vars(cfg),
+                         "meta": {"base": args.base, "full": True,
+                                  "epoch": epoch + 1, "steps": steps_done}}, fh)
     for epoch in range(args.epochs):
         perm = np.random.permutation(len(seqs))
         last = 0.0
@@ -179,16 +186,15 @@ def main():
             step_i += 1
             if step_i % every == 0:
                 emit(f"  {'step':<9} {step_i}/{total}  loss {last:.4f}")
+            if args.snapshot_every and step_i % args.snapshot_every == 0:
+                write_snapshot(epoch, step_i)
             if args.max_steps and step_i >= args.max_steps:
                 break
         val = np.mean([float(eval_step(params, jnp.asarray(val_seqs[i:i + args.batch_size]),
                                        jnp.asarray(val_masks[i:i + args.batch_size])))
                        for i in range(0, n_val, args.batch_size)]) if n_val else float("nan")
         emit(f"  {'epoch':<9} {epoch + 1}/{args.epochs}  loss {last:.4f}  val {val:.4f}  [{time.time()-t0:.0f}s]")
-        with open(args.snapshot, "wb") as fh:
-            pickle.dump({"params": jax.device_get(params), "config": vars(cfg),
-                         "meta": {"base": args.base, "full": True,
-                                  "epoch": epoch + 1}}, fh)
+        write_snapshot(epoch, step_i)
         if args.max_steps and step_i >= args.max_steps:
             break
 
